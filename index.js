@@ -3,6 +3,8 @@ const mongoose = require("mongoose")
 const People = require("./models/User")
 const cors = require("cors")
 const app = express()
+require("dotenv").config()
+const jwt = require("jsonwebtoken")
 const bcrypt = require("bcrypt")
 const Instagram = require("./models/Instagram")
 const Facebook = require("./models/Facebook")
@@ -16,8 +18,38 @@ mongoose.connect("mongodb://127.0.0.1:27017/People").then((res) => console.log("
 })
 
 app.use(cors())
-
 app.use(express.json())
+
+function generateAccessToken(data) {
+	const access_token = jwt.sign(data, process.env.MY_SECRET_KEY, { expiresIn: "45m" })
+	return access_token
+}
+function generateRefreshToken(data) {
+	const refresh_token = jwt.sign(data, process.env.MY_SECRET_KEY, { expiresIn: "7d" })
+	return refresh_token
+}
+
+// MiddleWare For Checking User is Authenticated or Not
+const authenticateUser = async (req, res, next) => {
+	try {
+		const authorizationHeader = req.headers["authorization"];
+		const token = authorizationHeader && authorizationHeader.split(" ")[1];
+		if (!token) {
+			return res.status(404).json({ success: false, message: "Unauthorized: Access token not provided" });
+		}
+		const decodedToken = jwt.verify(token, process.env.MY_SECRET_KEY);
+		const user = await People.findById(decodedToken.id)
+		if (!user) {
+			return res.status(500).json({ success: false, message: "Unauthorized: User not found" });
+		}
+		req.user = { id: user._id, email: user.email, role: "admin" };
+		next();
+	} catch (err) {
+		console.error("Authentication error:", err);
+		return res.status(401).json({ success: false, message: "Unauthorized: Invalid access token" });
+	}
+};
+
 
 const save = async (fetchid) => {
 	const ourID = fetchid.toString()
@@ -132,7 +164,7 @@ app.get("/social", async (req, res) => {
 
 app.post("/users/signup", async (req, res) => {
 	try {
-		const { email, password, cpassword } = req.body;
+		const { email, password } = req.body;
 		const userExists = await People.findOne({ email: email });
 
 		if (userExists) {
@@ -140,12 +172,11 @@ app.post("/users/signup", async (req, res) => {
 		}
 
 		const hashedPassword = await bcrypt.hash(password, 10);
-		const hashedCPassword = await bcrypt.hash(cpassword, 10);
 
 		const newUser = new People({
 			email,
 			pass: hashedPassword,
-			cpass: hashedCPassword
+
 		});
 
 		const user = await newUser.save();
@@ -163,17 +194,17 @@ app.post("/users/login", async (req, res) => {
 		const { email, password } = req.body;
 		console.log(req.body)
 		const user = await People.findOne({ email: email });
-
-		if (!user) {
-			return res.status(401).json({ message: 'User not found' });
-		}
 		const passwordMatch = await bcrypt.compare(password, user.pass);
-
-		if (passwordMatch) {
-			return res.status(200).json({ success: true, user: user._id, message: 'Login successful' });
-		} else {
-			return res.status(401).json({ message: 'Incorrect password' });
+		if (!user) {
+			res.json({ message: "User not Found", success: false })
 		}
+		if (!passwordMatch) {
+			return res.json({ message: "Incorrect Password", success: false });
+		}
+		const data = { id: user._id, email: user.email, role: "admin" }
+		const access_token = generateAccessToken(data)
+		const refresh_token = generateRefreshToken(data)
+		res.json({ access_token, refresh_token, user, success: true })
 	} catch (error) {
 		console.error(error);
 		return res.status(500).json({ message: 'An error occurred while processing your request' });
@@ -237,6 +268,36 @@ app.post("/contact/:id", async (req, res) => {
 		console.log(err)
 	}
 })
+
+app.post("/refresh", async (req, res) => {
+	try {
+		const { refresh_token } = req.body;
+
+		if (!refresh_token) {
+			return res.json({ success: false, message: "Refresh token not provided" });
+		}
+		jwt.verify(refresh_token, process.env.MY_SECRET_KEY, async (err, payload) => {
+			try {
+				if (err) {
+					return res.json({ success: false, message: "Invalid refresh token" });
+				}
+				const user = await People.findById(payload.id)
+				if (!user) {
+					return res.json({ success: false, message: "User not found" });
+				}
+				const data = { id: user._id, email: user.email, role: "admin" }
+				const access_token = generateAccessToken(data)
+				res.json({ success: true, access_token });
+			} catch (err) {
+				console.log(err)
+			}
+		})
+	} catch (err) {
+		console.log(err);
+		res.json({ success: false, message: "Internal server error" });
+	}
+});
+
 
 app.listen(PORT, () => {
 	console.log(`Connected on ${PORT}`)

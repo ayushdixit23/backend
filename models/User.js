@@ -7,7 +7,6 @@ const userSchema = new mongoose.Schema({
 		unique: true
 	},
 	pass: { type: String },
-	cpass: { type: String },
 	order: [
 		{
 			SocialMedia: String,
