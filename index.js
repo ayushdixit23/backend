@@ -10,22 +10,67 @@ const Instagram = require("./models/Instagram")
 const Facebook = require("./models/Facebook")
 const Youtube = require("./models/Youtube")
 const Telegram = require("./models/Telegram")
+const morgan = require("morgan")
+
 
 const PORT = process.env.PORT || 5000
 
-mongoose.connect("mongodb://127.0.0.1:27017/People").then((res) => console.log("connected to mongodb")).catch((err) => {
-	console.log(err)
-})
+
+// ANSI escape codes for colors
+const green = '\x1b[32m';
+const yellow = '\x1b[33m';
+const blue = '\x1b[34m';
+const red = '\x1b[31m';
+const gray = '\x1b[90m';
+const reset = '\x1b[0m';
+
+const customFormat = (tokens, req, res) => {
+	return [
+		tokens.method(req, res) === 'GET' ? green : yellow,
+		tokens.method(req, res),
+		blue,
+		tokens.url(req, res),
+		statusColor(tokens.status(req, res)),
+		gray,
+		tokens['response-time'](req, res) + ' ms',
+		reset,
+	].join(' ');
+};
+
+// Function to determine status color
+const statusColor = (status) => {
+	if (status >= 500) {
+		return red + status + reset;
+	} else if (status >= 400) {
+		return yellow + status + reset;
+	} else {
+		return green + status + reset;
+	}
+};
+
+app.use(morgan(customFormat));
+
+const connectDB = async () => {
+	try {
+		mongoose.set("strictQuery", false);
+		mongoose.connect(process.env.DATABASE).then(() => {
+			console.log("DB is connected");
+		});
+	} catch (err) {
+		console.log(err);
+	}
+};
+connectDB();
 
 app.use(cors())
 app.use(express.json())
 
 function generateAccessToken(data) {
-	const access_token = jwt.sign(data, process.env.MY_SECRET_KEY, { expiresIn: "45m" })
+	const access_token = jwt.sign(data, process.env.MY_SECRET_KEY, { expiresIn: "1h" })
 	return access_token
 }
 function generateRefreshToken(data) {
-	const refresh_token = jwt.sign(data, process.env.MY_SECRET_KEY, { expiresIn: "7d" })
+	const refresh_token = jwt.sign(data, process.env.MY_SECRET_KEY, { expiresIn: "10d" })
 	return refresh_token
 }
 
@@ -35,113 +80,184 @@ const authenticateUser = async (req, res, next) => {
 		const authorizationHeader = req.headers["authorization"];
 		const token = authorizationHeader && authorizationHeader.split(" ")[1];
 		if (!token) {
-			return res.status(404).json({ success: false, message: "Unauthorized: Access token not provided" });
+			return res.json({ success: false, message: "Unauthorized: Access token not provided" });
 		}
 		const decodedToken = jwt.verify(token, process.env.MY_SECRET_KEY);
 		const user = await People.findById(decodedToken.id)
 		if (!user) {
-			return res.status(500).json({ success: false, message: "Unauthorized: User not found" });
+			return res.json({ success: false, message: "Unauthorized: User not found" });
 		}
-		req.user = { id: user._id, email: user.email, role: "admin" };
+		req.user = { id: user._id, email: user.email };
 		next();
 	} catch (err) {
-		console.error("Authentication error:", err);
-		return res.status(401).json({ success: false, message: "Unauthorized: Invalid access token" });
+		return res.json({ success: false, message: "Unauthorized: Invalid access token" });
 	}
 };
 
+const instagramMetrics = [
+	{
+		Followers: "Followers",
+		Likes: "Likes",
+		Shares: "Shares",
+		Comments: "Comments",
+	},
+];
 
-const save = async (fetchid) => {
-	const ourID = fetchid.toString()
-	console.log(ourID)
+const facebookMetrics = [
+	{
+		Followers: "Followers",
+		Likes: "Likes",
+		Shares: "Shares",
+		Comments: "Comments",
+	},
+];
+
+const youtubeMetrics = [
+	{
+		Subscribers: "Subscribers",
+		Likes: "Likes",
+		Shares: "Shares",
+		Comments: "Comments",
+	},
+];
+
+const telegramMetrics = [
+	{
+		Members: "Members",
+		Likes: "Likes",
+		Shares: "Shares",
+		Comments: "Comments",
+	},
+];
+
+const createAndSaveSocialMediaModel = async (Model, name, offer, metrics) => {
+	try {
+		const existingModel = await Model.findOne({ name });
+
+		if (!existingModel) {
+			const modelInstance = new Model({
+				name,
+				offer,
+				information: metrics,
+			});
+
+			await modelInstance.save();
+			console.log(`${name} Model saved successfully!`);
+		} else {
+			console.log(`${name} Model already exists!`)
+		}
+	} catch (error) {
+		console.error(`Error saving ${name} Model:`, error);
+	}
+};
+// Create and save social media models
+createAndSaveSocialMediaModel(Instagram, "Instagram", 10, instagramMetrics);
+createAndSaveSocialMediaModel(Facebook, "Facebook", 20, facebookMetrics);
+createAndSaveSocialMediaModel(Youtube, "Youtube", 15, youtubeMetrics);
+createAndSaveSocialMediaModel(Telegram, "Telegram", 25, telegramMetrics);
+
+const save = async (fetchid, socialMedia) => {
+	const ourID = fetchid;
 	try {
 		const PeopleExist = await People.findById(ourID);
 
 		if (PeopleExist) {
+			let socialMediaModel;
 
-			const instagramexist = await Instagram.findOne({ name: "Instagram" })
-			if (instagramexist) {
-				await Instagram.updateOne({ _id: "6542653cdfbf126e32d59aa0" }, { $push: { uniqueid: ourID } })
-			} else {
-				const newInstagram = new Instagram({
-					name: "Instagram",
-					offer: 100,
-					information: [
-						{
-							Followers: "Followers",
-							Likes: "Likes",
-							Shares: "Shares",
-							Comments: "Comments",
-						}
-					],
-					uniqueid: PeopleExist._id
-				})
-				await newInstagram.save()
+			switch (socialMedia) {
+				case "instagram":
+					socialMediaModel = Instagram;
+					break;
+				case "facebook":
+					socialMediaModel = Facebook;
+					break;
+				case "youtube":
+					socialMediaModel = Youtube;
+					break;
+				case "telegram":
+					socialMediaModel = Telegram;
+					break;
+				default:
+					// Handle other social media types or do nothing
+					break;
 			}
 
-			const FacebookExists = await Facebook.findOne({ name: "Facebook" });
-			if (!FacebookExists) {
-				const newFacebook = new Facebook({
-					name: "Facebook",
-					offer: 40,
-					information: [
-						{
-							Followers: "Followers",
-							Likes: "Likes",
-							Shares: "Shares",
-							Comments: "Comments",
-						}
-					],
-					uniqueid: PeopleExist._id
-				})
-				await newFacebook.save()
-			} else {
-				await Facebook.updateOne({ _id: "65417c0ee641b1c3fcd403e8" }, { $push: { uniqueid: ourID } })
-			}
-			const YoutubeExists = await Youtube.findOne({ name: "Youtube" });
-			if (!YoutubeExists) {
-				const newYoutube = new Youtube({
-					name: "Youtube",
-					offer: 50,
-					information: [
-						{
-							Subscribers: "Subscribers",
-							Likes: "Likes",
-							Shares: "Shares",
-							Comments: "Comments",
-						}
-					],
-					uniqueid: PeopleExist._id
-				})
-				await newYoutube.save()
-			} else {
-				await Youtube.updateOne({ _id: "6541687ed2a65e442bd7d179" }, { $push: { uniqueid: ourID } })
-			}
+			if (socialMediaModel) {
+				const socialMediaExists = await socialMediaModel.findOne({
+					name: socialMedia,
+				});
 
-			const TelegramExists = await Telegram.findOne({ name: "Telegram" });
-			if (!TelegramExists) {
-				const newTelegram = new Telegram({
-					name: "Telegram",
-					offer: 70,
-					information: [
-						{
-							Subscribers: "Subscribers",
-							Likes: "Likes",
-							Shares: "Shares",
-							Comments: "Comments",
-						}
-					],
-					uniqueid: PeopleExist._id
-				})
-				await newTelegram.save()
-			} else {
-				await Telegram.updateOne({ _id: "65417c0ee641b1c3fcd403ef" }, { $push: { uniqueid: ourID } })
+				if (!socialMediaExists) {
+					const newSocialMedia = new socialMediaModel({
+						name: socialMedia,
+						offer: getOfferValueForSocialMedia(socialMedia),
+						information: getInformationForSocialMedia(socialMedia),
+						userid: PeopleExist._id,
+					});
+					await newSocialMedia.save();
+				} else {
+					await socialMediaModel.updateOne(
+						{ name: socialMedia },
+						{ $push: { userid: ourID } }
+					);
+				}
 			}
 		}
 	} catch (err) {
-		console.log(err)
+		console.log(err);
 	}
-}
+};
+
+const getOfferValueForSocialMedia = (socialMedia) => {
+	switch (socialMedia.toLowerCase()) {
+		case "instagram":
+			return 10;
+		case "facebook":
+			return 20;
+		case "youtube":
+			return 15;
+		case "telegram":
+			return 20;
+		default:
+			return 0;
+	}
+};
+
+const getInformationForSocialMedia = (socialMedia) => {
+	switch (socialMedia.toLowerCase()) {
+		case "instagram":
+		case "facebook":
+			return [
+				{
+					Followers: "Followers",
+					Likes: "Likes",
+					Shares: "Shares",
+					Comments: "Comments",
+				},
+			];
+
+		case "youtube":
+			return [
+				{
+					Subscribers: "Subscribers",
+					Likes: "Likes",
+					Shares: "Shares",
+					Comments: "Comments",
+				},
+			];
+		case "telegram":
+			return [
+				{
+					Members: "Members",
+					Likes: "Likes",
+					Shares: "Shares",
+					Comments: "Comments",
+				},
+			];
+		default:
+			return [];
+	}
+};
 
 app.get("/social", async (req, res) => {
 	try {
@@ -176,12 +292,11 @@ app.post("/users/signup", async (req, res) => {
 		const newUser = new People({
 			email,
 			pass: hashedPassword,
-
 		});
 
-		const user = await newUser.save();
+		await newUser.save();
 
-		save(user._id);
+		// save(user._id);
 		return res.status(201).json({ success: true, message: "User created successfully" });
 	} catch (error) {
 		console.error(error);
@@ -190,9 +305,10 @@ app.post("/users/signup", async (req, res) => {
 });
 
 app.post("/users/login", async (req, res) => {
+	console.log("ghj")
 	try {
 		const { email, password } = req.body;
-		console.log(req.body)
+
 		const user = await People.findOne({ email: email });
 		const passwordMatch = await bcrypt.compare(password, user.pass);
 		if (!user) {
@@ -201,10 +317,10 @@ app.post("/users/login", async (req, res) => {
 		if (!passwordMatch) {
 			return res.json({ message: "Incorrect Password", success: false });
 		}
-		const data = { id: user._id, email: user.email, role: "admin" }
+		const data = { id: user._id, email: user.email }
 		const access_token = generateAccessToken(data)
 		const refresh_token = generateRefreshToken(data)
-		res.json({ access_token, refresh_token, user, success: true })
+		res.status(200).json({ access_token, refresh_token, userid: user._id, success: true })
 	} catch (error) {
 		console.error(error);
 		return res.status(500).json({ message: 'An error occurred while processing your request' });
@@ -212,26 +328,31 @@ app.post("/users/login", async (req, res) => {
 });
 
 app.post("/socialmedia", async (req, res) => {
-	try {
-		const data = req.body
-		console.log(data)
 
-		await People.findOneAndUpdate({ _id: data.id }, {
+	console.log("first")
+	try {
+		const { userid, pid, link, count, category, socialMedia, price } = req.body
+
+		console.log(req.body)
+
+		await People.findOneAndUpdate({ _id: userid }, {
 			$push: {
 				order: {
-					SocialMedia: data.SocialMedia,
-					category: data.category,
-					link: data.link,
-					Count: data.Count,
-					price: data.price
+					SocialMedia: socialMedia,
+					category: category,
+					link: link,
+					Count: count,
+					price: price,
+					pid: pid
 				}
 			}
 		},
 			{ new: true, upsert: true })
-
-		res.status(200).json({ success: true })
+		save(userid, socialMedia)
+		res.status(200).json({ success: true, message: "Done" })
 	} catch (err) {
 		console.log(err)
+		res.status(400).json({ message: err, success: false })
 	}
 })
 
@@ -270,6 +391,7 @@ app.post("/contact/:id", async (req, res) => {
 })
 
 app.post("/refresh", async (req, res) => {
+	console.log("first")
 	try {
 		const { refresh_token } = req.body;
 
@@ -285,19 +407,20 @@ app.post("/refresh", async (req, res) => {
 				if (!user) {
 					return res.json({ success: false, message: "User not found" });
 				}
-				const data = { id: user._id, email: user.email, role: "admin" }
+				const data = { id: user._id, email: user.email }
 				const access_token = generateAccessToken(data)
+				console.log("runned")
 				res.json({ success: true, access_token });
 			} catch (err) {
 				console.log(err)
 			}
 		})
+
 	} catch (err) {
 		console.log(err);
 		res.json({ success: false, message: "Internal server error" });
 	}
 });
-
 
 app.listen(PORT, () => {
 	console.log(`Connected on ${PORT}`)

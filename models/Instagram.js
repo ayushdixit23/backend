@@ -12,7 +12,7 @@ const InstagramSchema = new mongoose.Schema({
 			Comments: { type: String },
 		}
 	],
-	uniqueid: [{
+	userid: [{
 		type: mongoose.Schema.Types.ObjectId,
 		ref: "People" // Referencing the People model
 	}]

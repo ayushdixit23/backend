@@ -6,13 +6,13 @@ const TelegramSchema = new mongoose.Schema({
 	img: { type: String },
 	information: [
 		{
-			Subscribers: { type: String },
+			Members: { type: String },
 			Likes: { type: String },
 			Shares: { type: String },
 			Comments: { type: String },
 		}
 	],
-	uniqueid: [{
+	userid: [{
 		type: mongoose.Schema.Types.ObjectId,
 		ref: "People"
 	}]
