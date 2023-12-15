@@ -7,8 +7,8 @@ const TelegramSchema = new mongoose.Schema({
 	information: [
 		{
 			Members: { type: String },
-			Likes: { type: String },
-			Shares: { type: String },
+			Reactions: { type: String },
+			Views: { type: String },
 			Comments: { type: String },
 		}
 	],

@@ -8,7 +8,7 @@ const FacebookSchema = new mongoose.Schema({
 		{
 			Followers: { type: String },
 			Likes: { type: String },
-			Shares: { type: String },
+			Views: { type: String },
 			Comments: { type: String },
 		}
 	],

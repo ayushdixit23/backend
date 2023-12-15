@@ -15,7 +15,6 @@ const morgan = require("morgan")
 
 const PORT = process.env.PORT || 5000
 
-
 // ANSI escape codes for colors
 const green = '\x1b[32m';
 const yellow = '\x1b[33m';
@@ -98,7 +97,7 @@ const instagramMetrics = [
 	{
 		Followers: "Followers",
 		Likes: "Likes",
-		Shares: "Shares",
+		Views: "Views",
 		Comments: "Comments",
 	},
 ];
@@ -107,7 +106,7 @@ const facebookMetrics = [
 	{
 		Followers: "Followers",
 		Likes: "Likes",
-		Shares: "Shares",
+		Views: "Views",
 		Comments: "Comments",
 	},
 ];
@@ -116,7 +115,7 @@ const youtubeMetrics = [
 	{
 		Subscribers: "Subscribers",
 		Likes: "Likes",
-		Shares: "Shares",
+		Views: "Views",
 		Comments: "Comments",
 	},
 ];
@@ -124,8 +123,8 @@ const youtubeMetrics = [
 const telegramMetrics = [
 	{
 		Members: "Members",
-		Likes: "Likes",
-		Shares: "Shares",
+		Reactions: "Reactions",
+		Views: "Views",
 		Comments: "Comments",
 	},
 ];
@@ -231,7 +230,7 @@ const getInformationForSocialMedia = (socialMedia) => {
 				{
 					Followers: "Followers",
 					Likes: "Likes",
-					Shares: "Shares",
+					Views: "Views",
 					Comments: "Comments",
 				},
 			];
@@ -241,7 +240,7 @@ const getInformationForSocialMedia = (socialMedia) => {
 				{
 					Subscribers: "Subscribers",
 					Likes: "Likes",
-					Shares: "Shares",
+					Views: "Views",
 					Comments: "Comments",
 				},
 			];
@@ -249,8 +248,8 @@ const getInformationForSocialMedia = (socialMedia) => {
 			return [
 				{
 					Members: "Members",
-					Likes: "Likes",
-					Shares: "Shares",
+					Reactions: "Reactions",
+					Views: "Views",
 					Comments: "Comments",
 				},
 			];

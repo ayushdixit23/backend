@@ -8,7 +8,7 @@ const YoutubeSchema = new mongoose.Schema({
 		{
 			Subscribers: { type: String },
 			Likes: { type: String },
-			Shares: { type: String },
+			Views: { type: String },
 			Comments: { type: String },
 		}
 	],
