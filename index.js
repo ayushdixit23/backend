@@ -51,7 +51,7 @@ app.use(morgan(customFormat));
 
 const connectDB = async () => {
 	try {
-		mongoose.set("strictQuery", false);
+		// mongoose.set("strictQuery", false);
 		mongoose.connect(process.env.DATABASE).then(() => {
 			console.log("DB is connected");
 		});
@@ -304,24 +304,22 @@ app.post("/users/signup", async (req, res) => {
 });
 
 app.post("/users/login", async (req, res) => {
-	console.log("ghj")
 	try {
 		const { email, password } = req.body;
 
 		const user = await People.findOne({ email: email });
 		const passwordMatch = await bcrypt.compare(password, user.pass);
 		if (!user) {
-			res.json({ message: "User not Found", success: false })
+			return res.status(400).json({ message: "User not Found", success: false })
 		}
 		if (!passwordMatch) {
-			return res.json({ message: "Incorrect Password", success: false });
+			return res.status(400).json({ message: "Incorrect Password", success: false });
 		}
 		const data = { id: user._id, email: user.email }
 		const access_token = generateAccessToken(data)
 		const refresh_token = generateRefreshToken(data)
 		res.status(200).json({ access_token, refresh_token, userid: user._id, success: true })
 	} catch (error) {
-		console.error(error);
 		return res.status(500).json({ message: 'An error occurred while processing your request' });
 	}
 });
